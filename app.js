@@ -7,15 +7,14 @@
   const META_STORE = 'appMeta';
   const BACKUP_FILE_NAME = 'vocab_backup.json';
   const AUTO_BACKUP_DEBOUNCE_MS = 10_000;
-  const INITIAL_RENDER_COUNT = 300;
-  const RENDER_INCREMENT = 300;
+  const PAGE_SIZE = 100;
 
   const state = {
     db: null,
     words: [],
     filteredWords: [],
     searchTerm: '',
-    renderedCount: INITIAL_RENDER_COUNT,
+    currentPage: 1,
     reviewPool: [],
     reviewIndex: 0,
     backupTimer: null,
@@ -25,12 +24,17 @@
   };
 
   const els = {
+    mainScreen: document.getElementById('mainScreen'),
+    listScreen: document.getElementById('listScreen'),
+    reviewScreen: document.getElementById('reviewScreen'),
     searchInput: document.getElementById('searchInput'),
     wordInput: document.getElementById('wordInput'),
     meaningInput: document.getElementById('meaningInput'),
     exampleInput: document.getElementById('exampleInput'),
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
+    wordListBtn: document.getElementById('wordListBtn'),
+    backToMainBtn: document.getElementById('backToMainBtn'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
@@ -38,6 +42,10 @@
     status: document.getElementById('status'),
     totalCount: document.getElementById('totalCount'),
     wordList: document.getElementById('wordList'),
+    paginationControls: document.getElementById('paginationControls'),
+    prevPageBtn: document.getElementById('prevPageBtn'),
+    nextPageBtn: document.getElementById('nextPageBtn'),
+    pageIndicator: document.getElementById('pageIndicator'),
     reviewSection: document.getElementById('reviewSection'),
     reviewEmpty: document.getElementById('reviewEmpty'),
     reviewContent: document.getElementById('reviewContent'),
@@ -47,7 +55,7 @@
     showMeaningBtn: document.getElementById('showMeaningBtn'),
     knownBtn: document.getElementById('knownBtn'),
     unknownBtn: document.getElementById('unknownBtn'),
-    closeReviewBtn: document.getElementById('closeReviewBtn')
+    exitReviewBtn: document.getElementById('exitReviewBtn')
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -96,6 +104,40 @@
     const all = await requestToPromise(tx.objectStore(WORDS_STORE).getAll());
     await txDone(tx);
     return all;
+  }
+
+  async function getWords(offset, limit) {
+    const db = await openDB();
+    const tx = db.transaction(WORDS_STORE, 'readonly');
+    const index = tx.objectStore(WORDS_STORE).index('createdAt');
+    const direction = 'prev';
+    const rows = [];
+    let skipped = 0;
+
+    await new Promise((resolve, reject) => {
+      const req = index.openCursor(null, direction);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor || rows.length >= limit) {
+          resolve();
+          return;
+        }
+
+        if (skipped < offset) {
+          const jump = Math.min(offset - skipped, 500);
+          skipped += jump;
+          cursor.advance(jump);
+          return;
+        }
+
+        rows.push(cursor.value);
+        cursor.continue();
+      };
+    });
+
+    await txDone(tx);
+    return rows;
   }
 
   async function addWord(row) {
@@ -151,13 +193,38 @@
     }, holdMs);
   }
 
+  function hideAllScreens() {
+    els.mainScreen.classList.add('hidden');
+    els.listScreen.classList.add('hidden');
+    els.reviewScreen.classList.add('hidden');
+  }
+
+  function showMainScreen() {
+    hideAllScreens();
+    els.mainScreen.classList.remove('hidden');
+  }
+
+  async function showListScreen() {
+    hideAllScreens();
+    els.listScreen.classList.remove('hidden');
+    await renderWordListPage();
+  }
+
+  function showReviewScreen() {
+    hideAllScreens();
+    els.reviewScreen.classList.remove('hidden');
+  }
+
   function applySearch() {
     const t = norm(state.searchTerm);
     state.filteredWords = t
       ? state.words.filter((row) => norm(row.word).includes(t) || norm(row.meaning).includes(t))
-      : state.words;
-    state.renderedCount = INITIAL_RENDER_COUNT;
-    renderWordList();
+      : [];
+    state.currentPage = 1;
+  }
+
+  function getPageCount(totalItems) {
+    return Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   }
 
   function renderTotalCount() {
@@ -201,6 +268,14 @@
       if (!confirm(`Delete "${row.word}"?`)) return;
       await deleteWordById(row.id);
       await reloadWords();
+
+      const totalItems = state.searchTerm ? state.filteredWords.length : state.words.length;
+      const pageCount = getPageCount(totalItems);
+      if (state.currentPage > pageCount) {
+        state.currentPage = pageCount;
+      }
+
+      await renderWordListPage();
       scheduleAutoBackup('delete');
       setStatus('Word deleted.');
     });
@@ -209,42 +284,46 @@
     return wrap;
   }
 
-  function renderWordList() {
-    const list = state.filteredWords;
-    if (!list.length) {
+  async function renderWordListPage() {
+    let list = [];
+    let totalItems = state.words.length;
+
+    if (state.searchTerm) {
+      list = state.filteredWords;
+      totalItems = list.length;
+      const offset = (state.currentPage - 1) * PAGE_SIZE;
+      list = list.slice(offset, offset + PAGE_SIZE);
+    } else {
+      const offset = (state.currentPage - 1) * PAGE_SIZE;
+      list = await getWords(offset, PAGE_SIZE);
+    }
+
+    const pageCount = getPageCount(totalItems);
+    if (state.currentPage > pageCount) {
+      state.currentPage = pageCount;
+      return renderWordListPage();
+    }
+
+    if (!totalItems) {
       const empty = document.createElement('p');
       empty.className = 'muted';
       empty.textContent = state.searchTerm ? 'No matching words.' : 'No words saved yet.';
       els.wordList.replaceChildren(empty);
+      els.paginationControls.classList.add('hidden');
       return;
     }
 
     const frag = document.createDocumentFragment();
-    const visible = list.slice(0, state.renderedCount);
-    for (const row of visible) {
+    for (const row of list) {
       frag.appendChild(makeWordRow(row));
     }
 
-    if (state.renderedCount < list.length) {
-      const moreWrap = document.createElement('div');
-      moreWrap.className = 'more-wrap';
-
-      const more = document.createElement('button');
-      more.textContent = `Load ${Math.min(RENDER_INCREMENT, list.length - state.renderedCount)} more`;
-      more.addEventListener('click', () => {
-        state.renderedCount += RENDER_INCREMENT;
-        renderWordList();
-      });
-
-      const note = document.createElement('span');
-      note.className = 'muted';
-      note.textContent = `Showing ${Math.min(state.renderedCount, list.length).toLocaleString()} / ${list.length.toLocaleString()}`;
-
-      moreWrap.append(more, note);
-      frag.appendChild(moreWrap);
-    }
-
     els.wordList.replaceChildren(frag);
+
+    els.paginationControls.classList.remove('hidden');
+    els.pageIndicator.textContent = `Page ${state.currentPage.toLocaleString()} of ${pageCount.toLocaleString()}`;
+    els.prevPageBtn.disabled = state.currentPage <= 1;
+    els.nextPageBtn.disabled = state.currentPage >= pageCount;
   }
 
   async function reloadWords() {
@@ -392,6 +471,7 @@
     }
 
     await reloadWords();
+    await renderWordListPage();
     scheduleAutoBackup('import');
     setStatus(`Imported ${inserted.toLocaleString()} new words.`, 2200);
   }
@@ -423,6 +503,9 @@
     els.wordInput.focus();
 
     await reloadWords();
+    if (!els.listScreen.classList.contains('hidden')) {
+      await renderWordListPage();
+    }
     scheduleAutoBackup('save');
 
     setStatus(`Saved in ${(performance.now() - started).toFixed(1)} ms.`);
@@ -432,7 +515,7 @@
     state.reviewPool = [...state.words];
     state.reviewIndex = 0;
     state.reviewPool.sort(() => Math.random() - 0.5);
-    els.reviewSection.classList.remove('hidden');
+    showReviewScreen();
 
     if (!state.reviewPool.length) {
       els.reviewEmpty.classList.remove('hidden');
@@ -446,7 +529,7 @@
   }
 
   function closeReviewMode() {
-    els.reviewSection.classList.add('hidden');
+    showMainScreen();
   }
 
   function renderReviewWord() {
@@ -484,6 +567,9 @@
     renderReviewWord();
 
     await reloadWords();
+    if (!els.listScreen.classList.contains('hidden')) {
+      await renderWordListPage();
+    }
     scheduleAutoBackup('review');
     setStatus(isKnown ? 'Marked known.' : 'Marked unknown.');
   }
@@ -502,14 +588,31 @@
       searchTimer = setTimeout(() => {
         state.searchTerm = els.searchInput.value;
         applySearch();
+        if (!els.listScreen.classList.contains('hidden')) {
+          renderWordListPage().catch(console.error);
+        }
       }, 60);
     });
 
     els.reviewModeBtn.addEventListener('click', startReviewMode);
-    els.closeReviewBtn.addEventListener('click', closeReviewMode);
+    els.exitReviewBtn.addEventListener('click', closeReviewMode);
+    els.wordListBtn.addEventListener('click', () => showListScreen().catch(console.error));
+    els.backToMainBtn.addEventListener('click', showMainScreen);
+
     els.showMeaningBtn.addEventListener('click', () => els.reviewMeaning.classList.remove('hidden'));
     els.knownBtn.addEventListener('click', () => reviewStep(true).catch(console.error));
     els.unknownBtn.addEventListener('click', () => reviewStep(false).catch(console.error));
+
+    els.prevPageBtn.addEventListener('click', () => {
+      if (state.currentPage <= 1) return;
+      state.currentPage -= 1;
+      renderWordListPage().catch(console.error);
+    });
+
+    els.nextPageBtn.addEventListener('click', () => {
+      state.currentPage += 1;
+      renderWordListPage().catch(console.error);
+    });
 
     els.exportBtn.addEventListener('click', manualExport);
     els.importBtn.addEventListener('click', () => els.importFile.click());
@@ -572,6 +675,7 @@
     await reloadWords();
     await initBackupHandle();
     await registerSW();
+    showMainScreen();
     els.wordInput.focus();
   }
 
