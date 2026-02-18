@@ -24,6 +24,10 @@ body {
   padding: 1rem;
 }
 
+.screen {
+  width: 100%;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -114,14 +118,6 @@ button:hover { background: #f1f5f9; }
 .delete-btn { color: var(--danger); border-color: #fecaca; }
 .delete-btn:hover { background: #fef2f2; }
 
-.more-wrap {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0.6rem;
-}
-
 .review-header {
   display: flex;
   justify-content: space-between;
@@ -134,7 +130,27 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
 .review-example { margin: 0.25rem 0 0.8rem; color: var(--muted); }
 .muted { color: var(--muted); font-size: 0.9rem; }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+#reviewScreen {
+  min-height: calc(100vh - 2rem);
+  display: flex;
+}
+
+.review-fullscreen {
+  width: 100%;
+  min-height: calc(100vh - 2rem);
+  margin-bottom: 0;
+}
+
 @media (max-width: 640px) {
   .app { padding: 0.75rem; }
   .word-item { grid-template-columns: 1fr; }
+  .pagination-controls { flex-wrap: wrap; }
 }
