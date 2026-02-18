@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Vocab" />
+  <title>Offline Vocabulary</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>Vocabulary</h1>
+        <p class="subtitle">Offline-first • IndexedDB • OneDrive-ready backup</p>
+      </div>
+      <div class="count" id="totalCount">0 words</div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <label for="searchInput">Search</label>
+        <input id="searchInput" type="text" placeholder="Search word or meaning..." autocomplete="off" />
+      </div>
+
+      <div class="grid">
+        <div class="row">
+          <label for="wordInput">Word</label>
+          <input id="wordInput" type="text" placeholder="Word" autocomplete="off" />
+        </div>
+        <div class="row">
+          <label for="meaningInput">Meaning</label>
+          <input id="meaningInput" type="text" placeholder="Meaning (Enter to save)" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="exampleInput">Example sentence (optional)</label>
+        <input id="exampleInput" type="text" placeholder="Example sentence" autocomplete="off" />
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" class="primary">Save</button>
+        <button id="reviewModeBtn">Review Mode</button>
+        <button id="exportBtn">Export backup</button>
+        <button id="importBtn">Import backup</button>
+        <button id="backupLinkBtn">Link vocab_backup.json</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden />
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section class="card">
+      <div id="wordList" class="word-list" aria-live="polite"></div>
+    </section>
+
+    <section id="reviewSection" class="card hidden" aria-live="polite">
+      <div class="review-header">
+        <h2>Review Mode</h2>
+        <button id="closeReviewBtn" class="ghost">Close</button>
+      </div>
+      <div id="reviewEmpty" class="muted hidden">No words available for review.</div>
+      <div id="reviewContent" class="hidden">
+        <p class="review-word" id="reviewWord"></p>
+        <p class="review-meaning hidden" id="reviewMeaning"></p>
+        <p class="review-example" id="reviewExample"></p>
+        <div class="actions">
+          <button id="showMeaningBtn">Show Meaning</button>
+          <button id="knownBtn" class="primary">Known</button>
+          <button id="unknownBtn">Unknown</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
