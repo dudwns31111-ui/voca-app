@@ -9,7 +9,6 @@
   const AUTO_BACKUP_DEBOUNCE_MS = 10_000;
   const DEFAULT_PAGE_SIZE = 100;
   const MAX_PAGE_SIZE = 200;
-  const DAY_MS = 24 * 60 * 60 * 1000;
 
   const state = {
     db: null,
@@ -164,6 +163,14 @@
 
   function formatDate(ts) {
     return ts ? new Date(ts).toLocaleString() : '-';
+  }
+
+  function getNextReviewAt(intervalDays) {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(0, 0, 0, 0);
+    next.setDate(next.getDate() + intervalDays);
+    return next.getTime();
   }
 
   function setStatus(message, holdMs = 1700) {
@@ -646,7 +653,7 @@
       ...current,
       interval: nextInterval,
       lastReviewedAt: now,
-      nextReviewAt: now + nextInterval * DAY_MS,
+      nextReviewAt: isKnown ? getNextReviewAt(nextInterval) : getNextReviewAt(1),
       reviewCount: isKnown ? (current.reviewCount || 0) + 1 : (current.reviewCount || 0)
     };
 
@@ -828,4 +835,5 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
