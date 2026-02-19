@@ -25,16 +25,13 @@
 
   const els = {
     mainScreen: document.getElementById('mainScreen'),
-    listScreen: document.getElementById('listScreen'),
-    reviewScreen: document.getElementById('reviewScreen'),
+    reviewOverlay: document.getElementById('reviewOverlay'),
     searchInput: document.getElementById('searchInput'),
     wordInput: document.getElementById('wordInput'),
     meaningInput: document.getElementById('meaningInput'),
     exampleInput: document.getElementById('exampleInput'),
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
-    wordListBtn: document.getElementById('wordListBtn'),
-    backToMainBtn: document.getElementById('backToMainBtn'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
@@ -46,7 +43,6 @@
     prevPageBtn: document.getElementById('prevPageBtn'),
     nextPageBtn: document.getElementById('nextPageBtn'),
     pageIndicator: document.getElementById('pageIndicator'),
-    reviewSection: document.getElementById('reviewSection'),
     reviewEmpty: document.getElementById('reviewEmpty'),
     reviewContent: document.getElementById('reviewContent'),
     reviewWord: document.getElementById('reviewWord'),
@@ -193,26 +189,17 @@
     }, holdMs);
   }
 
-  function hideAllScreens() {
-    els.mainScreen.classList.add('hidden');
-    els.listScreen.classList.add('hidden');
-    els.reviewScreen.classList.add('hidden');
+  function isReviewModeOpen() {
+    return !els.reviewOverlay.classList.contains('hidden');
   }
 
   function showMainScreen() {
-    hideAllScreens();
     els.mainScreen.classList.remove('hidden');
+    els.reviewOverlay.classList.add('hidden');
   }
 
-  async function showListScreen() {
-    hideAllScreens();
-    els.listScreen.classList.remove('hidden');
-    await renderWordListPage();
-  }
-
-  function showReviewScreen() {
-    hideAllScreens();
-    els.reviewScreen.classList.remove('hidden');
+  function showReviewOverlay() {
+    els.reviewOverlay.classList.remove('hidden');
   }
 
   function applySearch() {
@@ -332,6 +319,7 @@
     state.words = rows;
     renderTotalCount();
     applySearch();
+    await renderWordListPage();
   }
 
   function asBackupArray(rows) {
@@ -471,7 +459,6 @@
     }
 
     await reloadWords();
-    await renderWordListPage();
     scheduleAutoBackup('import');
     setStatus(`Imported ${inserted.toLocaleString()} new words.`, 2200);
   }
@@ -503,9 +490,6 @@
     els.wordInput.focus();
 
     await reloadWords();
-    if (!els.listScreen.classList.contains('hidden')) {
-      await renderWordListPage();
-    }
     scheduleAutoBackup('save');
 
     setStatus(`Saved in ${(performance.now() - started).toFixed(1)} ms.`);
@@ -515,7 +499,7 @@
     state.reviewPool = [...state.words];
     state.reviewIndex = 0;
     state.reviewPool.sort(() => Math.random() - 0.5);
-    showReviewScreen();
+    showReviewOverlay();
 
     if (!state.reviewPool.length) {
       els.reviewEmpty.classList.remove('hidden');
@@ -567,11 +551,35 @@
     renderReviewWord();
 
     await reloadWords();
-    if (!els.listScreen.classList.contains('hidden')) {
-      await renderWordListPage();
-    }
     scheduleAutoBackup('review');
     setStatus(isKnown ? 'Marked known.' : 'Marked unknown.');
+  }
+
+  function handleReviewShortcuts(event) {
+    if (!isReviewModeOpen()) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeReviewMode();
+      return;
+    }
+
+    if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      els.reviewMeaning.classList.remove('hidden');
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      reviewStep(true).catch(console.error);
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      reviewStep(false).catch(console.error);
+    }
   }
 
   function bindEvents() {
@@ -588,16 +596,12 @@
       searchTimer = setTimeout(() => {
         state.searchTerm = els.searchInput.value;
         applySearch();
-        if (!els.listScreen.classList.contains('hidden')) {
-          renderWordListPage().catch(console.error);
-        }
+        renderWordListPage().catch(console.error);
       }, 60);
     });
 
     els.reviewModeBtn.addEventListener('click', startReviewMode);
     els.exitReviewBtn.addEventListener('click', closeReviewMode);
-    els.wordListBtn.addEventListener('click', () => showListScreen().catch(console.error));
-    els.backToMainBtn.addEventListener('click', showMainScreen);
 
     els.showMeaningBtn.addEventListener('click', () => els.reviewMeaning.classList.remove('hidden'));
     els.knownBtn.addEventListener('click', () => reviewStep(true).catch(console.error));
@@ -647,6 +651,8 @@
         void doImmediateExitBackup('visibilitychange');
       }
     });
+
+    document.addEventListener('keydown', handleReviewShortcuts);
   }
 
   async function registerSW() {
