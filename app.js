@@ -9,6 +9,7 @@
   const AUTO_BACKUP_DEBOUNCE_MS = 10_000;
   const DEFAULT_PAGE_SIZE = 100;
   const MAX_PAGE_SIZE = 200;
+  let displayOrder = 'word-first';
 
   const state = {
     db: null,
@@ -38,6 +39,7 @@
     exampleInput: document.getElementById('exampleInput'),
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
+    displayOrderSelect: document.getElementById('displayOrderSelect'),
     sortBySelect: document.getElementById('sortBySelect'),
     pageSizeSelect: document.getElementById('pageSizeSelect'),
     exportBtn: document.getElementById('exportBtn'),
@@ -320,13 +322,13 @@
     const main = document.createElement('div');
     main.className = 'word-main';
 
-    const word = document.createElement('p');
-    word.className = 'word-label';
-    word.textContent = row.word;
+    const primary = document.createElement('p');
+    primary.className = 'word-label';
+    primary.textContent = displayOrder === 'meaning-first' ? row.meaning : row.word;
 
-    const meaning = document.createElement('p');
-    meaning.className = 'meaning hidden';
-    meaning.textContent = row.meaning;
+    const secondary = document.createElement('p');
+    secondary.className = 'meaning hidden';
+    secondary.textContent = displayOrder === 'meaning-first' ? row.word : row.meaning;
 
     const ex = document.createElement('p');
     ex.className = 'example';
@@ -336,9 +338,9 @@
     meta.className = 'meta';
     meta.textContent = `Added: ${formatDate(row.createdAt)} • Reviews: ${row.reviewCount || 0}`;
 
-    word.addEventListener('click', () => meaning.classList.toggle('hidden'));
+    primary.addEventListener('click', () => secondary.classList.toggle('hidden'));
 
-    main.append(word, meaning);
+    main.append(primary, secondary);
     if (row.example) main.appendChild(ex);
     main.appendChild(meta);
 
@@ -733,6 +735,11 @@
       renderWordListPage().catch(console.error);
     });
 
+    els.displayOrderSelect.addEventListener('change', () => {
+      displayOrder = els.displayOrderSelect.value;
+      renderWordListPage().catch(console.error);
+    });
+
     els.pageSizeSelect.addEventListener('change', () => {
       const next = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(els.pageSizeSelect.value) || DEFAULT_PAGE_SIZE));
       state.pageSize = next;
@@ -821,6 +828,7 @@
   async function init() {
     await openDB();
     bindEvents();
+    els.displayOrderSelect.value = displayOrder;
     els.sortBySelect.value = state.sortBy;
     els.pageSizeSelect.value = String(state.pageSize);
     await reloadWords();
@@ -835,5 +843,6 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
