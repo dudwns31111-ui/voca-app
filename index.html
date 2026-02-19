@@ -57,8 +57,31 @@
           <h2>Word List</h2>
         </div>
 
-        <div id="wordList" class="word-list" aria-live="polite"></div>
+        <div class="actions" aria-label="Word list controls">
+          <div class="row">
+            <label for="sortBySelect">Sort by</label>
+            <select id="sortBySelect">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="mostReviewed">Most reviewed</option>
+              <option value="leastReviewed">Least reviewed</option>
+              <option value="alphabetical">Alphabetical</option>
+            </select>
+          </div>
 
+          <div class="row">
+            <label for="pageSizeSelect">Show</label>
+            <select id="pageSizeSelect">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="200">200</option>
+            </select>
+            <span class="muted">per page</span>
+          </div>
+        </div>
+
+        <div id="wordList" class="word-list" aria-live="polite"></div>
+    
         <div id="paginationControls" class="pagination-controls hidden">
           <button id="prevPageBtn">Previous</button>
           <span id="pageIndicator" class="muted">Page 1 of 1</span>
@@ -94,6 +117,3 @@
   <script src="app.js" defer></script>
 </body>
 </html>
-
-
-
