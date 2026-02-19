@@ -54,7 +54,6 @@
     reviewEmpty: document.getElementById('reviewEmpty'),
     reviewContent: document.getElementById('reviewContent'),
     reviewWord: document.getElementById('reviewWord'),
-    reviewPhonetic: document.getElementById('reviewPhonetic'),
     reviewMeaning: document.getElementById('reviewMeaning'),
     reviewExample: document.getElementById('reviewExample'),
     showMeaningBtn: document.getElementById('showMeaningBtn'),
@@ -114,28 +113,8 @@
   async function addWord(row) {
     const db = await openDB();
     const tx = db.transaction(WORDS_STORE, 'readwrite');
-    const id = await requestToPromise(tx.objectStore(WORDS_STORE).add(row));
+    tx.objectStore(WORDS_STORE).add(row);
     await txDone(tx);
-    return id;
-  }
-
-  async function updateWordPhonetic(id, phonetic) {
-    if (!id || !phonetic) return false;
-    const db = await openDB();
-    const tx = db.transaction(WORDS_STORE, 'readwrite');
-    const store = tx.objectStore(WORDS_STORE);
-    const row = await requestToPromise(store.get(id));
-    if (!row) {
-      await txDone(tx);
-      return false;
-    }
-    if (row.phonetic === phonetic) {
-      await txDone(tx);
-      return false;
-    }
-    store.put({ ...row, phonetic });
-    await txDone(tx);
-    return true;
   }
 
   async function putWord(row) {
@@ -193,27 +172,6 @@
     setStatus.timer = setTimeout(() => {
       if (els.status.textContent === message) els.status.textContent = '';
     }, holdMs);
-  }
-
-  async function fetchPhonetic(word) {
-    try {
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-      if (!response.ok) return '';
-      const data = await response.json();
-      if (!Array.isArray(data)) return '';
-
-      for (const entry of data) {
-        const fromPhonetics = entry?.phonetics?.find((item) => item?.text)?.text;
-        if (fromPhonetics) return fromPhonetics;
-
-        const fallbackPhonetic = typeof entry?.phonetic === 'string' ? entry.phonetic.trim() : '';
-        if (fallbackPhonetic) return fallbackPhonetic;
-      }
-
-      return '';
-    } catch {
-      return '';
-    }
   }
 
   function isReviewModeOpen() {
@@ -356,7 +314,7 @@
 
     const word = document.createElement('p');
     word.className = 'word-label';
-    word.textContent = row.phonetic ? `${row.word} ${row.phonetic}` : row.word;
+    word.textContent = row.word;
 
     const meaning = document.createElement('p');
     meaning.className = 'meaning hidden';
@@ -445,8 +403,7 @@
       reviewCount: Number(r.reviewCount) || 0,
       interval: Number(r.interval) || 1,
       nextReviewAt: Number(r.nextReviewAt) || Date.now(),
-      lastReviewedAt: Number(r.lastReviewedAt) || 0,
-      phonetic: String(r.phonetic || '').trim()
+      lastReviewedAt: Number(r.lastReviewedAt) || 0
     }));
   }
 
@@ -565,7 +522,6 @@
         word,
         meaning,
         example: String(row?.example || '').trim(),
-        phonetic: String(row?.phonetic || '').trim(),
         createdAt: Number(row?.createdAt) || now,
         reviewCount: Number(row?.reviewCount) || 0,
         interval: Number(row?.interval),
@@ -597,18 +553,16 @@
     }
 
     const started = performance.now();
-    const createdAt = Date.now();
-    const newWord = {
+    await addWord({
       word,
       meaning,
       example,
-      createdAt,
+      createdAt: Date.now(),
       reviewCount: 0,
       interval: 1,
-      nextReviewAt: createdAt,
+      nextReviewAt: Date.now(),
       lastReviewedAt: 0
-    };
-    const id = await addWord(newWord);
+    });
 
     els.wordInput.value = '';
     els.meaningInput.value = '';
@@ -617,33 +571,6 @@
 
     await reloadWords();
     scheduleAutoBackup('save');
-
-    void fetchPhonetic(word).then(async (phonetic) => {
-      if (!phonetic) return;
-      const updated = await updateWordPhonetic(id, phonetic);
-      if (!updated) return;
-
-      const existing = state.words.find((row) => row.id === id);
-      if (existing) {
-        existing.phonetic = phonetic;
-        state.wordsVersion += 1;
-        state.sortedWordsCacheKey = '';
-        refreshReviewButtonLabel();
-        applySearch();
-        await renderWordListPage();
-
-        const reviewCurrent = state.reviewPool[0];
-        if (reviewCurrent?.id === id) {
-          reviewCurrent.phonetic = phonetic;
-          els.reviewWord.textContent = existing.word;
-          els.reviewPhonetic.textContent = phonetic;
-          els.reviewPhonetic.classList.remove('hidden');
-        }
-      } else {
-        await reloadWords();
-      }
-      scheduleAutoBackup('phonetic');
-    }).catch(() => {});
 
     setStatus(`Saved in ${(performance.now() - started).toFixed(1)} ms.`);
   }
@@ -683,8 +610,6 @@
 
     const row = state.reviewPool[0];
     els.reviewWord.textContent = row.word;
-    els.reviewPhonetic.textContent = row.phonetic || '';
-    els.reviewPhonetic.classList.toggle('hidden', !row.phonetic);
     els.reviewMeaning.textContent = row.meaning;
     els.reviewMeaning.classList.add('hidden');
     els.reviewExample.textContent = row.example ? `Example: ${row.example}` : '';
