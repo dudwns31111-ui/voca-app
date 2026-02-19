@@ -7,16 +7,22 @@
   const META_STORE = 'appMeta';
   const BACKUP_FILE_NAME = 'vocab_backup.json';
   const AUTO_BACKUP_DEBOUNCE_MS = 10_000;
-  const PAGE_SIZE = 100;
+  const DEFAULT_PAGE_SIZE = 100;
+  const MAX_PAGE_SIZE = 200;
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
   const state = {
     db: null,
     words: [],
     filteredWords: [],
+    sortedWordsCache: [],
+    sortedWordsCacheKey: '',
+    wordsVersion: 0,
     searchTerm: '',
     currentPage: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    sortBy: 'newest',
     reviewPool: [],
-    reviewIndex: 0,
     backupTimer: null,
     backupInFlight: false,
     pendingBackupReason: null,
@@ -32,6 +38,8 @@
     exampleInput: document.getElementById('exampleInput'),
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
+    sortBySelect: document.getElementById('sortBySelect'),
+    pageSizeSelect: document.getElementById('pageSizeSelect'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
@@ -102,40 +110,6 @@
     return all;
   }
 
-  async function getWords(offset, limit) {
-    const db = await openDB();
-    const tx = db.transaction(WORDS_STORE, 'readonly');
-    const index = tx.objectStore(WORDS_STORE).index('createdAt');
-    const direction = 'prev';
-    const rows = [];
-    let skipped = 0;
-
-    await new Promise((resolve, reject) => {
-      const req = index.openCursor(null, direction);
-      req.onerror = () => reject(req.error);
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor || rows.length >= limit) {
-          resolve();
-          return;
-        }
-
-        if (skipped < offset) {
-          const jump = Math.min(offset - skipped, 500);
-          skipped += jump;
-          cursor.advance(jump);
-          return;
-        }
-
-        rows.push(cursor.value);
-        cursor.continue();
-      };
-    });
-
-    await txDone(tx);
-    return rows;
-  }
-
   async function addWord(row) {
     const db = await openDB();
     const tx = db.transaction(WORDS_STORE, 'readwrite');
@@ -147,6 +121,17 @@
     const db = await openDB();
     const tx = db.transaction(WORDS_STORE, 'readwrite');
     tx.objectStore(WORDS_STORE).put(row);
+    await txDone(tx);
+  }
+
+  async function putWords(rows) {
+    if (!rows.length) return;
+    const db = await openDB();
+    const tx = db.transaction(WORDS_STORE, 'readwrite');
+    const store = tx.objectStore(WORDS_STORE);
+    for (const row of rows) {
+      store.put(row);
+    }
     await txDone(tx);
   }
 
@@ -202,21 +187,122 @@
     els.reviewOverlay.classList.remove('hidden');
   }
 
+  function migrationDefaults(row, now = Date.now()) {
+    const migrated = { ...row };
+    let changed = false;
+
+    if (!Number.isFinite(migrated.createdAt) || migrated.createdAt <= 0) {
+      migrated.createdAt = now;
+      changed = true;
+    }
+
+    if (!Number.isFinite(migrated.reviewCount) || migrated.reviewCount < 0) {
+      migrated.reviewCount = 0;
+      changed = true;
+    }
+
+    if (!Number.isFinite(migrated.interval) || migrated.interval < 1) {
+      migrated.interval = 1;
+      changed = true;
+    }
+
+    if (!Number.isFinite(migrated.nextReviewAt) || migrated.nextReviewAt <= 0) {
+      migrated.nextReviewAt = now;
+      changed = true;
+    }
+
+    if (!Number.isFinite(migrated.lastReviewedAt) || migrated.lastReviewedAt < 0) {
+      migrated.lastReviewedAt = 0;
+      changed = true;
+    }
+
+    return { row: migrated, changed };
+  }
+
+  async function migrateWordsIfNeeded(rows) {
+    const now = Date.now();
+    const migratedRows = [];
+    const changedRows = [];
+
+    for (const row of rows) {
+      const migrated = migrationDefaults(row, now);
+      migratedRows.push(migrated.row);
+      if (migrated.changed) changedRows.push(migrated.row);
+    }
+
+    if (changedRows.length) {
+      await putWords(changedRows);
+    }
+
+    return migratedRows;
+  }
+
   function applySearch() {
     const t = norm(state.searchTerm);
     state.filteredWords = t
       ? state.words.filter((row) => norm(row.word).includes(t) || norm(row.meaning).includes(t))
       : [];
     state.currentPage = 1;
+    state.sortedWordsCacheKey = '';
   }
 
   function getPageCount(totalItems) {
-    return Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    return Math.max(1, Math.ceil(totalItems / state.pageSize));
   }
 
   function renderTotalCount() {
     const count = state.words.length;
     els.totalCount.textContent = `${count.toLocaleString()} ${count === 1 ? 'word' : 'words'}`;
+  }
+
+  function compareWords(a, b) {
+    switch (state.sortBy) {
+      case 'oldest':
+        return a.createdAt - b.createdAt;
+      case 'mostReviewed':
+        return (b.reviewCount || 0) - (a.reviewCount || 0) || b.createdAt - a.createdAt;
+      case 'leastReviewed':
+        return (a.reviewCount || 0) - (b.reviewCount || 0) || b.createdAt - a.createdAt;
+      case 'alphabetical':
+        return a.word.localeCompare(b.word, undefined, { sensitivity: 'base' }) || b.createdAt - a.createdAt;
+      case 'newest':
+      default:
+        return b.createdAt - a.createdAt;
+    }
+  }
+
+  function getActiveSource() {
+    return state.searchTerm ? state.filteredWords : state.words;
+  }
+
+  function getSortedWordsForRender() {
+    const source = getActiveSource();
+    const cacheKey = `${state.wordsVersion}|${state.sortBy}|${state.pageSize}|${norm(state.searchTerm)}`;
+    if (state.sortedWordsCacheKey === cacheKey) {
+      return state.sortedWordsCache;
+    }
+
+    const sorted = source.slice();
+    sorted.sort(compareWords);
+    state.sortedWordsCache = sorted;
+    state.sortedWordsCacheKey = cacheKey;
+    return sorted;
+  }
+
+  function getDueWords() {
+    const now = Date.now();
+    return state.words.filter((row) => row.nextReviewAt <= now);
+  }
+
+  function refreshReviewButtonLabel() {
+    const dueCount = getDueWords().length;
+    els.reviewModeBtn.textContent = `Review Mode (${dueCount.toLocaleString()} due)`;
+  }
+
+  function setReviewButtonsEnabled(enabled) {
+    els.showMeaningBtn.disabled = !enabled;
+    els.knownBtn.disabled = !enabled;
+    els.unknownBtn.disabled = !enabled;
   }
 
   function makeWordRow(row) {
@@ -255,14 +341,6 @@
       if (!confirm(`Delete "${row.word}"?`)) return;
       await deleteWordById(row.id);
       await reloadWords();
-
-      const totalItems = state.searchTerm ? state.filteredWords.length : state.words.length;
-      const pageCount = getPageCount(totalItems);
-      if (state.currentPage > pageCount) {
-        state.currentPage = pageCount;
-      }
-
-      await renderWordListPage();
       scheduleAutoBackup('delete');
       setStatus('Word deleted.');
     });
@@ -272,23 +350,12 @@
   }
 
   async function renderWordListPage() {
-    let list = [];
-    let totalItems = state.words.length;
-
-    if (state.searchTerm) {
-      list = state.filteredWords;
-      totalItems = list.length;
-      const offset = (state.currentPage - 1) * PAGE_SIZE;
-      list = list.slice(offset, offset + PAGE_SIZE);
-    } else {
-      const offset = (state.currentPage - 1) * PAGE_SIZE;
-      list = await getWords(offset, PAGE_SIZE);
-    }
-
+    const sorted = getSortedWordsForRender();
+    const totalItems = sorted.length;
     const pageCount = getPageCount(totalItems);
+
     if (state.currentPage > pageCount) {
       state.currentPage = pageCount;
-      return renderWordListPage();
     }
 
     if (!totalItems) {
@@ -300,13 +367,15 @@
       return;
     }
 
+    const offset = (state.currentPage - 1) * state.pageSize;
+    const list = sorted.slice(offset, offset + state.pageSize);
+
     const frag = document.createDocumentFragment();
     for (const row of list) {
       frag.appendChild(makeWordRow(row));
     }
 
     els.wordList.replaceChildren(frag);
-
     els.paginationControls.classList.remove('hidden');
     els.pageIndicator.textContent = `Page ${state.currentPage.toLocaleString()} of ${pageCount.toLocaleString()}`;
     els.prevPageBtn.disabled = state.currentPage <= 1;
@@ -315,9 +384,11 @@
 
   async function reloadWords() {
     const rows = await getAllWords();
-    rows.sort((a, b) => b.createdAt - a.createdAt);
-    state.words = rows;
+    state.words = await migrateWordsIfNeeded(rows);
+    state.wordsVersion += 1;
+    state.sortedWordsCacheKey = '';
     renderTotalCount();
+    refreshReviewButtonLabel();
     applySearch();
     await renderWordListPage();
   }
@@ -330,7 +401,9 @@
       example: r.example || '',
       createdAt: r.createdAt,
       reviewCount: Number(r.reviewCount) || 0,
-      lastReviewedAt: r.lastReviewedAt || null
+      interval: Number(r.interval) || 1,
+      nextReviewAt: Number(r.nextReviewAt) || Date.now(),
+      lastReviewedAt: Number(r.lastReviewedAt) || 0
     }));
   }
 
@@ -444,14 +517,19 @@
       const key = `${norm(word)}|${norm(meaning)}`;
       if (existing.has(key)) continue;
 
-      await addWord({
+      const now = Date.now();
+      const migrated = migrationDefaults({
         word,
         meaning,
         example: String(row?.example || '').trim(),
-        createdAt: Number(row?.createdAt) || Date.now(),
+        createdAt: Number(row?.createdAt) || now,
         reviewCount: Number(row?.reviewCount) || 0,
-        lastReviewedAt: Number(row?.lastReviewedAt) || null
-      });
+        interval: Number(row?.interval),
+        nextReviewAt: Number(row?.nextReviewAt),
+        lastReviewedAt: Number(row?.lastReviewedAt)
+      }, now).row;
+
+      await addWord(migrated);
       existing.add(key);
       inserted += 1;
 
@@ -481,7 +559,9 @@
       example,
       createdAt: Date.now(),
       reviewCount: 0,
-      lastReviewedAt: null
+      interval: 1,
+      nextReviewAt: Date.now(),
+      lastReviewedAt: 0
     });
 
     els.wordInput.value = '';
@@ -496,19 +576,21 @@
   }
 
   function startReviewMode() {
-    state.reviewPool = [...state.words];
-    state.reviewIndex = 0;
+    state.reviewPool = getDueWords();
     state.reviewPool.sort(() => Math.random() - 0.5);
     showReviewOverlay();
 
     if (!state.reviewPool.length) {
+      els.reviewEmpty.textContent = 'No words due for review 🎉';
       els.reviewEmpty.classList.remove('hidden');
       els.reviewContent.classList.add('hidden');
+      setReviewButtonsEnabled(false);
       return;
     }
 
     els.reviewEmpty.classList.add('hidden');
     els.reviewContent.classList.remove('hidden');
+    setReviewButtonsEnabled(true);
     renderReviewWord();
   }
 
@@ -518,17 +600,15 @@
 
   function renderReviewWord() {
     if (!state.reviewPool.length) {
+      els.reviewEmpty.textContent = 'No words due for review 🎉';
       els.reviewEmpty.classList.remove('hidden');
       els.reviewContent.classList.add('hidden');
+      setReviewButtonsEnabled(false);
+      refreshReviewButtonLabel();
       return;
     }
 
-    if (state.reviewIndex >= state.reviewPool.length) {
-      state.reviewPool.sort(() => Math.random() - 0.5);
-      state.reviewIndex = 0;
-    }
-
-    const row = state.reviewPool[state.reviewIndex];
+    const row = state.reviewPool[0];
     els.reviewWord.textContent = row.word;
     els.reviewMeaning.textContent = row.meaning;
     els.reviewMeaning.classList.add('hidden');
@@ -538,19 +618,40 @@
   async function reviewStep(isKnown) {
     if (!state.reviewPool.length) return;
 
-    const current = state.reviewPool[state.reviewIndex];
+    const current = state.reviewPool[0];
+    const now = Date.now();
+    const nextInterval = isKnown
+      ? Math.max(1, Math.round((current.interval || 1) * 2))
+      : 1;
+
     const updated = {
       ...current,
-      reviewCount: (current.reviewCount || 0) + 1,
-      lastReviewedAt: Date.now()
+      interval: nextInterval,
+      lastReviewedAt: now,
+      nextReviewAt: now + nextInterval * DAY_MS,
+      reviewCount: isKnown ? (current.reviewCount || 0) + 1 : (current.reviewCount || 0)
     };
 
     await putWord(updated);
-    state.reviewPool[state.reviewIndex] = updated;
-    state.reviewIndex += 1;
-    renderReviewWord();
 
-    await reloadWords();
+    const i = state.words.findIndex((row) => row.id === updated.id);
+    if (i >= 0) {
+      state.words[i] = updated;
+      state.wordsVersion += 1;
+      state.sortedWordsCacheKey = '';
+    }
+
+    state.reviewPool.shift();
+    renderReviewWord();
+    refreshReviewButtonLabel();
+
+    if (!state.searchTerm) {
+      await renderWordListPage();
+    } else {
+      applySearch();
+      await renderWordListPage();
+    }
+
     scheduleAutoBackup('review');
     setStatus(isKnown ? 'Marked known.' : 'Marked unknown.');
   }
@@ -566,19 +667,21 @@
 
     if (event.code === 'Space' || event.key === ' ') {
       event.preventDefault();
-      els.reviewMeaning.classList.remove('hidden');
+      if (!els.showMeaningBtn.disabled) {
+        els.reviewMeaning.classList.remove('hidden');
+      }
       return;
     }
 
     if (event.key === 'ArrowRight') {
       event.preventDefault();
-      reviewStep(true).catch(console.error);
+      if (!els.knownBtn.disabled) reviewStep(true).catch(console.error);
       return;
     }
 
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      reviewStep(false).catch(console.error);
+      if (!els.unknownBtn.disabled) reviewStep(false).catch(console.error);
     }
   }
 
@@ -600,10 +703,29 @@
       }, 60);
     });
 
+    els.sortBySelect.addEventListener('change', () => {
+      state.sortBy = els.sortBySelect.value;
+      state.currentPage = 1;
+      state.sortedWordsCacheKey = '';
+      renderWordListPage().catch(console.error);
+    });
+
+    els.pageSizeSelect.addEventListener('change', () => {
+      const next = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(els.pageSizeSelect.value) || DEFAULT_PAGE_SIZE));
+      state.pageSize = next;
+      els.pageSizeSelect.value = String(next);
+      state.currentPage = 1;
+      renderWordListPage().catch(console.error);
+    });
+
     els.reviewModeBtn.addEventListener('click', startReviewMode);
     els.exitReviewBtn.addEventListener('click', closeReviewMode);
 
-    els.showMeaningBtn.addEventListener('click', () => els.reviewMeaning.classList.remove('hidden'));
+    els.showMeaningBtn.addEventListener('click', () => {
+      if (!els.showMeaningBtn.disabled) {
+        els.reviewMeaning.classList.remove('hidden');
+      }
+    });
     els.knownBtn.addEventListener('click', () => reviewStep(true).catch(console.error));
     els.unknownBtn.addEventListener('click', () => reviewStep(false).catch(console.error));
 
@@ -678,6 +800,8 @@
   async function init() {
     await openDB();
     bindEvents();
+    els.sortBySelect.value = state.sortBy;
+    els.pageSizeSelect.value = String(state.pageSize);
     await reloadWords();
     await initBackupHandle();
     await registerSW();
