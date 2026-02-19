@@ -47,21 +47,14 @@
         <div class="actions">
           <button id="saveBtn" class="primary">Save</button>
           <button id="reviewModeBtn">Review Mode</button>
-          <button id="wordListBtn">Word List</button>
           <button id="exportBtn">Export backup</button>
           <button id="importBtn">Import backup</button>
           <button id="backupLinkBtn">Link vocab_backup.json</button>
           <input id="importFile" type="file" accept="application/json,.json" hidden />
         </div>
         <p id="status" class="status" aria-live="polite"></p>
-      </section>
-    </section>
-
-    <section id="listScreen" class="screen hidden">
-      <section class="card">
-        <div class="review-header">
+        <div class="review-header list-header">
           <h2>Word List</h2>
-          <button id="backToMainBtn" class="ghost">Back</button>
         </div>
 
         <div id="wordList" class="word-list" aria-live="polite"></div>
@@ -78,14 +71,14 @@
       <section id="reviewSection" class="card review-fullscreen">
         <div class="review-header">
           <h2>Review Mode</h2>
-          <button id="exitReviewBtn" class="ghost">Exit</button>
-        </div>
-        <div id="reviewEmpty" class="muted hidden">No words available for review.</div>
-        <div id="reviewContent" class="hidden">
-          <p class="review-word" id="reviewWord"></p>
-          <p class="review-meaning hidden" id="reviewMeaning"></p>
-          <p class="review-example" id="reviewExample"></p>
-          <div class="actions">
+      </section>␊
+    </section>␊
+␊
+    <section id="reviewOverlay" class="review-overlay hidden" aria-live="polite">
+      <section id="reviewCard" class="card review-card">
+        <div class="review-header">␊
+          <h2>Review Mode</h2>␊
+          <button id="exitReviewBtn" class="ghost">Exit</button>␊
             <button id="showMeaningBtn">Show Meaning</button>
             <button id="knownBtn" class="primary">Known</button>
             <button id="unknownBtn">Unknown</button>
@@ -98,3 +91,4 @@
   <script src="app.js" defer></script>
 </body>
 </html>
+
