@@ -70,7 +70,16 @@ input {
   padding: 0.62rem 0.72rem;
   font-size: 0.95rem;
 }
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.62rem 0.72rem;
+  font-size: 0.95rem;
+  background: #fff;
+}
 input:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
+select:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
@@ -168,3 +177,4 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
   .word-item { grid-template-columns: 1fr; }
   .pagination-controls { flex-wrap: wrap; }
 }
+
