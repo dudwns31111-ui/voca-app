@@ -23,6 +23,7 @@
     pageSize: DEFAULT_PAGE_SIZE,
     sortBy: 'newest',
     reviewPool: [],
+    currentReviewDirection: 'word-first',
     backupTimer: null,
     backupInFlight: false,
     pendingBackupReason: null,
@@ -604,15 +605,32 @@
       els.reviewEmpty.classList.remove('hidden');
       els.reviewContent.classList.add('hidden');
       setReviewButtonsEnabled(false);
+      els.showMeaningBtn.textContent = 'Show Meaning';
       refreshReviewButtonLabel();
       return;
     }
 
     const row = state.reviewPool[0];
-    els.reviewWord.textContent = row.word;
-    els.reviewMeaning.textContent = row.meaning;
+    state.currentReviewDirection = Math.random() < 0.7 ? 'meaning-first' : 'word-first';
+
+    if (state.currentReviewDirection === 'meaning-first') {
+      els.reviewWord.textContent = row.meaning;
+      els.reviewMeaning.textContent = row.word;
+      els.showMeaningBtn.textContent = 'Show Word';
+    } else {
+      els.reviewWord.textContent = row.word;
+      els.reviewMeaning.textContent = row.meaning;
+      els.showMeaningBtn.textContent = 'Show Meaning';
+    }
+
+    els.reviewWord.classList.remove('hidden');
     els.reviewMeaning.classList.add('hidden');
     els.reviewExample.textContent = row.example ? `Example: ${row.example}` : '';
+  }
+
+  function revealHiddenReviewSide() {
+    if (els.showMeaningBtn.disabled) return;
+    els.reviewMeaning.classList.remove('hidden');
   }
 
   async function reviewStep(isKnown) {
@@ -667,9 +685,7 @@
 
     if (event.code === 'Space' || event.key === ' ') {
       event.preventDefault();
-      if (!els.showMeaningBtn.disabled) {
-        els.reviewMeaning.classList.remove('hidden');
-      }
+      revealHiddenReviewSide();
       return;
     }
 
@@ -722,9 +738,7 @@
     els.exitReviewBtn.addEventListener('click', closeReviewMode);
 
     els.showMeaningBtn.addEventListener('click', () => {
-      if (!els.showMeaningBtn.disabled) {
-        els.reviewMeaning.classList.remove('hidden');
-      }
+      revealHiddenReviewSide();
     });
     els.knownBtn.addEventListener('click', () => reviewStep(true).catch(console.error));
     els.unknownBtn.addEventListener('click', () => reviewStep(false).catch(console.error));
@@ -814,3 +828,4 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
