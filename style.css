@@ -83,6 +83,15 @@ select:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+.list-controls {
+  justify-content: flex-end;
+}
+
+.list-controls .row {
+  margin-bottom: 0;
+  min-width: 110px;
+}
+
 button {
   border: 1px solid var(--border);
   background: #fff;
@@ -177,4 +186,5 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
   .word-item { grid-template-columns: 1fr; }
   .pagination-controls { flex-wrap: wrap; }
 }
+
 
