@@ -200,7 +200,17 @@
       const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
       if (!response.ok) return '';
       const data = await response.json();
-      return data?.[0]?.phonetics?.find((p) => p?.text)?.text || '';
+      if (!Array.isArray(data)) return '';
+
+      for (const entry of data) {
+        const fromPhonetics = entry?.phonetics?.find((item) => item?.text)?.text;
+        if (fromPhonetics) return fromPhonetics;
+
+        const fallbackPhonetic = typeof entry?.phonetic === 'string' ? entry.phonetic.trim() : '';
+        if (fallbackPhonetic) return fallbackPhonetic;
+      }
+
+      return '';
     } catch {
       return '';
     }
