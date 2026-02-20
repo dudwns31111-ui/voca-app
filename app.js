@@ -54,6 +54,7 @@
     linkBtn: document.getElementById('linkBtn'),
     status: document.getElementById('status'),
     totalCount: document.getElementById('totalCount'),
+    statisticsBar: document.getElementById('statisticsBar'),
     wordList: document.getElementById('wordList'),
     paginationControls: document.getElementById('paginationControls'),
     prevPageBtn: document.getElementById('prevPageBtn'),
@@ -270,6 +271,33 @@
     return Math.max(1, Math.ceil(totalItems / state.pageSize));
   }
 
+  function getStartOfToday() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  function calculateStatistics(words) {
+    const startOfToday = getStartOfToday();
+    let newToday = 0;
+    let learned = 0;
+
+    for (const word of words) {
+      if (word.createdAt >= startOfToday) newToday += 1;
+      if (word.interval >= 7) learned += 1;
+    }
+
+    return { newToday, learned };
+  }
+
+  function renderStatistics(words) {
+    if (!els.statisticsBar) return;
+    if (window.matchMedia('(max-width: 600px)').matches) return;
+
+    const stats = calculateStatistics(words);
+    els.statisticsBar.innerHTML = `New: ${stats.newToday} &nbsp;&nbsp; Learned: ${stats.learned}`;
+  }
+
   function renderTotalCount() {
     const count = state.words.length;
     els.totalCount.textContent = `${count.toLocaleString()} ${count === 1 ? 'word' : 'words'}`;
@@ -410,6 +438,7 @@
     state.wordsVersion += 1;
     state.sortedWordsCacheKey = '';
     renderTotalCount();
+    renderStatistics(state.words);
     refreshReviewButtonLabel();
     applySearch();
     await renderWordListPage();
@@ -684,6 +713,7 @@
     state.reviewPool.shift();
     renderReviewWord();
     refreshReviewButtonLabel();
+    renderStatistics(state.words);
 
     if (!state.searchTerm) {
       await renderWordListPage();
@@ -891,4 +921,5 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
