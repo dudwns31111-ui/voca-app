@@ -187,4 +187,74 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
   .pagination-controls { flex-wrap: wrap; }
 }
 
+@media (max-width: 600px) {
+  .mobile-primary-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
 
+  .mobile-primary-actions button {
+    flex: 1;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 10px;
+  }
+
+  .add-word-form {
+    display: none;
+  }
+
+  .add-word-form.active {
+    display: block;
+  }
+
+  .search-container {
+    margin-bottom: 16px;
+  }
+
+  .word-list-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .word-list-controls select {
+    flex: 1;
+    padding: 8px;
+  }
+
+  .word-card {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .word-primary {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .word-secondary {
+    display: block;
+    font-size: 14px;
+    opacity: 0.7;
+  }
+
+  .word-meta {
+    font-size: 12px;
+    opacity: 0.5;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #saveBtn,
+  #reviewModeBtn {
+    display: none;
+  }
+}
