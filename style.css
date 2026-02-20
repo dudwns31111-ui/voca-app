@@ -318,6 +318,7 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
 @media (min-width: 601px) {
   .word-list-controls {
     align-items: flex-start;
+    margin-bottom: 0.4rem;
   }
 
   .word-list-controls .row {
@@ -333,6 +334,7 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
     width: 120px;
   }
 }
+
 
 
 
