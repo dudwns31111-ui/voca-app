@@ -83,6 +83,18 @@ select:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+.backup-container {
+  display: contents;
+}
+
+#backupToggleBtn {
+  display: none;
+}
+
+.backup-menu {
+  display: contents;
+}
+
 .list-controls {
   justify-content: flex-end;
 }
@@ -253,8 +265,32 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
     align-items: center;
   }
 
-  #saveBtn,
   #reviewModeBtn {
     display: none;
+  }
+
+  .backup-container {
+    display: block;
+    width: 100%;
+  }
+
+  #backupToggleBtn {
+    display: block;
+    width: 100%;
+  }
+
+  .backup-menu {
+    display: none;
+    margin-top: 8px;
+  }
+
+  .backup-menu.active {
+    display: block;
+  }
+
+  .backup-menu button {
+    display: block;
+    width: 100%;
+    margin-bottom: 6px;
   }
 }
