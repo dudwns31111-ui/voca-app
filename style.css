@@ -315,5 +315,25 @@ h2 { margin: 0 0 0.6rem; font-size: 1.1rem; }
   }
 }
 
+@media (min-width: 601px) {
+  .word-list-controls {
+    align-items: flex-start;
+  }
+
+  .word-list-controls .row {
+    margin-bottom: 0;
+  }
+
+  .word-list-controls .row:nth-child(1),
+  .word-list-controls .row:nth-child(2) {
+    width: 220px;
+  }
+
+  .word-list-controls .row:nth-child(3) {
+    width: 120px;
+  }
+}
+
+
 
 
