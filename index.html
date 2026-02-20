@@ -23,10 +23,10 @@
       </header>
 
       <div id="mobilePrimaryActions" class="mobile-primary-actions hidden" aria-label="Primary actions">
-        <button id="mobileAddWordBtn" type="button" class="primary">+ Add Word</button>
+        <button id="addWordToggleBtn" type="button" class="primary">+ Add Word</button>
         <button id="mobileReviewBtn" type="button">Review Mode</button>
       </div>
-
+      
       <section class="card">
         <div class="row search-container">
           <label for="searchInput">Search</label>
@@ -54,16 +54,16 @@
         <div class="actions">
           <button id="saveBtn" class="primary">Save</button>
           <button id="reviewModeBtn">Review Mode</button>
-          <button id="exportBtn">Export backup</button>
-          <button id="importBtn">Import backup</button>
-          <button id="backupLinkBtn">Link vocab_backup.json</button>
+          <div class="backup-container">
+            <button id="backupToggleBtn" type="button">Backup ▼</button>
+            <div id="backupMenu" class="backup-menu">
+              <button id="exportBtn" type="button">Export backup</button>
+              <button id="importBtn" type="button">Import backup</button>
+              <button id="linkBtn" type="button">Link vocab_backup.json</button>
+            </div>
+          </div>
           <input id="importFile" type="file" accept="application/json,.json" hidden />
         </div>
-        <p id="status" class="status" aria-live="polite"></p>
-        <div class="review-header list-header">
-          <h2>Word List</h2>
-        </div>
-
         <div class="actions word-list-controls" aria-label="Word list controls">
           <div class="row">
             <label for="displayOrderSelect">Display</label>
@@ -131,5 +131,6 @@
   <script src="app.js" defer></script>
 </body>
 </html>
+
 
 
