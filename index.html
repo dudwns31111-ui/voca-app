@@ -14,7 +14,7 @@
 <body>
   <main class="app">
     <section id="mainScreen" class="screen">
-      <header class="topbar">
+      <header class="topbar header">
         <div>
           <h1>Vocabulary</h1>
           <p class="subtitle">Offline-first • IndexedDB • OneDrive-ready backup</p>
@@ -22,26 +22,33 @@
         <div class="count" id="totalCount">0 words</div>
       </header>
 
+      <div id="mobilePrimaryActions" class="mobile-primary-actions hidden" aria-label="Primary actions">
+        <button id="mobileAddWordBtn" type="button" class="primary">+ Add Word</button>
+        <button id="mobileReviewBtn" type="button">Review Mode</button>
+      </div>
+
       <section class="card">
-        <div class="row">
+        <div class="row search-container">
           <label for="searchInput">Search</label>
           <input id="searchInput" type="text" placeholder="Search word or meaning..." autocomplete="off" />
         </div>
 
-        <div class="grid">
-          <div class="row">
-            <label for="wordInput">Word</label>
-            <input id="wordInput" type="text" placeholder="Word" autocomplete="off" />
+        <div id="addWordForm" class="add-word-form">
+          <div class="grid">
+            <div class="row">
+              <label for="wordInput">Word</label>
+              <input id="wordInput" type="text" placeholder="Word" autocomplete="off" />
+            </div>
+            <div class="row">
+              <label for="meaningInput">Meaning</label>
+              <input id="meaningInput" type="text" placeholder="Meaning (Enter to save)" autocomplete="off" />
+            </div>
           </div>
-          <div class="row">
-            <label for="meaningInput">Meaning</label>
-            <input id="meaningInput" type="text" placeholder="Meaning (Enter to save)" autocomplete="off" />
-          </div>
-        </div>
 
-        <div class="row">
-          <label for="exampleInput">Example sentence (optional)</label>
-          <input id="exampleInput" type="text" placeholder="Example sentence" autocomplete="off" />
+          <div class="row">
+            <label for="exampleInput">Example sentence (optional)</label>
+            <input id="exampleInput" type="text" placeholder="Example sentence" autocomplete="off" />
+          </div>
         </div>
 
         <div class="actions">
@@ -57,7 +64,7 @@
           <h2>Word List</h2>
         </div>
 
-        <div class="actions" aria-label="Word list controls">
+        <div class="actions word-list-controls" aria-label="Word list controls">
           <div class="row">
             <label for="displayOrderSelect">Display</label>
             <select id="displayOrderSelect">
@@ -124,4 +131,5 @@
   <script src="app.js" defer></script>
 </body>
 </html>
+
 
