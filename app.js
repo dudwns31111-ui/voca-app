@@ -40,7 +40,7 @@
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
     mobilePrimaryActions: document.getElementById('mobilePrimaryActions'),
-    mobileAddWordBtn: document.getElementById('mobileAddWordBtn'),
+    addWordToggleBtn: document.getElementById('addWordToggleBtn'),
     mobileReviewBtn: document.getElementById('mobileReviewBtn'),
     addWordForm: document.getElementById('addWordForm'),
     displayOrderSelect: document.getElementById('displayOrderSelect'),
@@ -48,8 +48,10 @@
     pageSizeSelect: document.getElementById('pageSizeSelect'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
+    backupToggleBtn: document.getElementById('backupToggleBtn'),
+    backupMenu: document.getElementById('backupMenu'),
     importFile: document.getElementById('importFile'),
-    backupLinkBtn: document.getElementById('backupLinkBtn'),
+    linkBtn: document.getElementById('linkBtn'),
     status: document.getElementById('status'),
     totalCount: document.getElementById('totalCount'),
     wordList: document.getElementById('wordList'),
@@ -587,6 +589,7 @@
     els.wordInput.value = '';
     els.meaningInput.value = '';
     els.exampleInput.value = '';
+    els.addWordForm.classList.remove('active');
     els.wordInput.focus();
 
     await reloadWords();
@@ -728,23 +731,14 @@
       saveWord().catch(console.error);
     });
 
-    if (els.mobileAddWordBtn) {
-      els.mobileAddWordBtn.addEventListener('click', () => {
-        if (!isMobile()) {
-          saveWord().catch(console.error);
-          return;
-        }
-
-        if (!els.addWordForm.classList.contains('active')) {
-          els.addWordForm.classList.add('active');
-          els.wordInput.focus();
-          return;
-        }
-
-        saveWord().catch(console.error);
+    if (els.addWordToggleBtn) {
+      els.addWordToggleBtn.addEventListener('click', () => {
+        if (!window.matchMedia('(max-width: 600px)').matches) return;
+        const isActive = els.addWordForm.classList.toggle('active');
+        if (isActive) els.wordInput.focus();
       });
     }
-
+    
     if (els.mobileReviewBtn) {
       els.mobileReviewBtn.addEventListener('click', startReviewMode);
     }
@@ -812,12 +806,19 @@
       });
     });
 
-    els.backupLinkBtn.addEventListener('click', () => {
+    els.linkBtn.addEventListener('click', () => {
       linkBackupFile().catch((error) => {
         console.error(error);
         setStatus('Unable to link backup file.', 2200);
       });
     });
+
+    if (els.backupToggleBtn && els.backupMenu) {
+      els.backupToggleBtn.addEventListener('click', () => {
+        if (!window.matchMedia('(max-width: 600px)').matches) return;
+        els.backupMenu.classList.toggle('active');
+      });
+    }
 
     window.addEventListener('beforeunload', () => {
       void doImmediateExitBackup('beforeunload');
@@ -890,3 +891,4 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
