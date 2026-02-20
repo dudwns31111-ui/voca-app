@@ -39,6 +39,10 @@
     exampleInput: document.getElementById('exampleInput'),
     saveBtn: document.getElementById('saveBtn'),
     reviewModeBtn: document.getElementById('reviewModeBtn'),
+    mobilePrimaryActions: document.getElementById('mobilePrimaryActions'),
+    mobileAddWordBtn: document.getElementById('mobileAddWordBtn'),
+    mobileReviewBtn: document.getElementById('mobileReviewBtn'),
+    addWordForm: document.getElementById('addWordForm'),
     displayOrderSelect: document.getElementById('displayOrderSelect'),
     sortBySelect: document.getElementById('sortBySelect'),
     pageSizeSelect: document.getElementById('pageSizeSelect'),
@@ -65,6 +69,10 @@
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function isMobile() {
+    return window.matchMedia('(max-width: 600px)').matches;
+  }
 
   function requestToPromise(req) {
     return new Promise((resolve, reject) => {
@@ -306,7 +314,9 @@
 
   function refreshReviewButtonLabel() {
     const dueCount = getDueWords().length;
+    const label = `Review (${dueCount.toLocaleString()} due)`;
     els.reviewModeBtn.textContent = `Review Mode (${dueCount.toLocaleString()} due)`;
+    if (els.mobileReviewBtn) els.mobileReviewBtn.textContent = label;
   }
 
   function setReviewButtonsEnabled(enabled) {
@@ -317,17 +327,17 @@
 
   function makeWordRow(row) {
     const wrap = document.createElement('article');
-    wrap.className = 'word-item';
+    wrap.className = 'word-item word-card';
 
     const main = document.createElement('div');
     main.className = 'word-main';
 
     const primary = document.createElement('p');
-    primary.className = 'word-label';
+    primary.className = 'word-label word-primary';
     primary.textContent = displayOrder === 'meaning-first' ? row.meaning : row.word;
 
     const secondary = document.createElement('p');
-    secondary.className = 'meaning hidden';
+    secondary.className = 'meaning hidden word-secondary';
     secondary.textContent = displayOrder === 'meaning-first' ? row.word : row.meaning;
 
     const ex = document.createElement('p');
@@ -335,8 +345,8 @@
     ex.textContent = row.example || '';
 
     const meta = document.createElement('p');
-    meta.className = 'meta';
-    meta.textContent = `Added: ${formatDate(row.createdAt)} • Reviews: ${row.reviewCount || 0}`;
+    meta.className = 'meta word-meta';
+    meta.textContent = `Reviews: ${row.reviewCount || 0} • Added: ${formatDate(row.createdAt)}`;
 
     primary.addEventListener('click', () => secondary.classList.toggle('hidden'));
 
@@ -718,6 +728,27 @@
       saveWord().catch(console.error);
     });
 
+    if (els.mobileAddWordBtn) {
+      els.mobileAddWordBtn.addEventListener('click', () => {
+        if (!isMobile()) {
+          saveWord().catch(console.error);
+          return;
+        }
+
+        if (!els.addWordForm.classList.contains('active')) {
+          els.addWordForm.classList.add('active');
+          els.wordInput.focus();
+          return;
+        }
+
+        saveWord().catch(console.error);
+      });
+    }
+
+    if (els.mobileReviewBtn) {
+      els.mobileReviewBtn.addEventListener('click', startReviewMode);
+    }
+
     let searchTimer = null;
     els.searchInput.addEventListener('input', () => {
       clearTimeout(searchTimer);
@@ -825,12 +856,28 @@
     if (ok) await backupToLinkedFile('startup');
   }
 
+  function syncMobileUI() {
+    if (!els.mobilePrimaryActions || !els.addWordForm) return;
+
+    const mobile = isMobile();
+    els.mobilePrimaryActions.classList.toggle('hidden', !mobile);
+
+    if (!mobile) {
+      els.addWordForm.classList.remove('active');
+      return;
+    }
+
+    els.addWordForm.classList.remove('active');
+  }
+
   async function init() {
     await openDB();
     bindEvents();
     els.displayOrderSelect.value = displayOrder;
     els.sortBySelect.value = state.sortBy;
     els.pageSizeSelect.value = String(state.pageSize);
+    syncMobileUI();
+    window.matchMedia('(max-width: 600px)').addEventListener('change', syncMobileUI);
     await reloadWords();
     await initBackupHandle();
     await registerSW();
@@ -843,6 +890,3 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
-
-
-
