@@ -563,20 +563,8 @@
     setStatus('Exported vocab_backup.json');
   }
 
-  async function importBackup(file) {
-    const raw = await file.text();
-    let rows;
-    try {
-      rows = JSON.parse(raw);
-    } catch {
-      setStatus('Invalid JSON file.', 2200);
-      return;
-    }
-
-    if (!Array.isArray(rows)) {
-      setStatus('Backup format must be a JSON array.', 2200);
-      return;
-    }
+  async function importBackupRows(rows) {
+    if (!Array.isArray(rows)) return 0;
 
     const existing = new Set(state.words.map((r) => `${norm(r.word)}|${norm(r.meaning)}`));
     let inserted = 0;
@@ -608,9 +596,50 @@
       if (inserted % 1500 === 0) await sleep(0);
     }
 
+    return inserted;
+  }
+
+  async function importBackup(file) {
+    const raw = await file.text();
+    let rows;
+    try {
+      rows = JSON.parse(raw);
+    } catch {
+      setStatus('Invalid JSON file.', 2200);
+      return;
+    }
+
+    if (!Array.isArray(rows)) {
+      setStatus('Backup format must be a JSON array.', 2200);
+      return;
+    }
+
+    const inserted = await importBackupRows(rows);
+
     await reloadWords();
     scheduleAutoBackup('import');
     setStatus(`Imported ${inserted.toLocaleString()} new words.`, 2200);
+  }
+
+  async function syncFromLinkedBackupFile() {
+    if (!state.backupHandle?.getFile) return 0;
+
+    const file = await state.backupHandle.getFile();
+    const raw = await file.text();
+    if (!raw.trim()) return 0;
+
+    let rows;
+    try {
+      rows = JSON.parse(raw);
+    } catch {
+      return 0;
+    }
+
+    if (!Array.isArray(rows)) return 0;
+
+    const inserted = await importBackupRows(rows);
+    if (inserted > 0) await reloadWords();
+    return inserted;
   }
 
   async function saveWord() {
@@ -916,7 +945,13 @@
 
     try {
       const ok = await ensureBackupPermission();
-      if (ok) await backupToLinkedFile('startup');
+      if (ok) {
+        const inserted = await syncFromLinkedBackupFile();
+        if (inserted > 0) {
+          setStatus(`Synced ${inserted.toLocaleString()} new words from linked backup.`, 2600);
+        }
+        await backupToLinkedFile('startup');
+      }
     } catch (error) {
       console.warn('Linked backup startup sync failed. Continuing app initialization.', error);
       setStatus('Linked backup unavailable. Use Export backup or relink the file.', 2800);
@@ -957,6 +992,7 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
 
