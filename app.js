@@ -77,6 +77,19 @@
     return window.matchMedia('(max-width: 600px)').matches;
   }
 
+  function observeMediaQuery(query, handler) {
+    const mediaQueryList = window.matchMedia(query);
+
+    if (typeof mediaQueryList.addEventListener === 'function') {
+      mediaQueryList.addEventListener('change', handler);
+      return;
+    }
+
+    if (typeof mediaQueryList.addListener === 'function') {
+      mediaQueryList.addListener(handler);
+    }
+  }
+
   function requestToPromise(req) {
     return new Promise((resolve, reject) => {
       req.onsuccess = () => resolve(req.result);
@@ -920,7 +933,7 @@
     els.sortBySelect.value = state.sortBy;
     els.pageSizeSelect.value = String(state.pageSize);
     syncMobileUI();
-    window.matchMedia('(max-width: 600px)').addEventListener('change', syncMobileUI);
+    observeMediaQuery('(max-width: 600px)', syncMobileUI);
     await reloadWords();
     await initBackupHandle();
     await registerSW();
@@ -933,6 +946,7 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
 
