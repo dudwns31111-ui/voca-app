@@ -809,12 +809,15 @@
 
   function bindEvents() {
     els.saveBtn.addEventListener('click', () => saveWord().catch(console.error));
-    els.meaningInput.addEventListener('keydown', (event) => {
+    const saveOnEnter = (event) => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
       saveWord().catch(console.error);
-    });
+    };
 
+    els.meaningInput.addEventListener('keydown', saveOnEnter);
+    els.exampleInput.addEventListener('keydown', saveOnEnter);
+    
     if (els.addWordToggleBtn) {
       els.addWordToggleBtn.addEventListener('click', () => {
         if (!window.matchMedia('(max-width: 600px)').matches) return;
@@ -992,6 +995,7 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
 
