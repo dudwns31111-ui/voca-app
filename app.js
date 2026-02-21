@@ -902,14 +902,25 @@
   }
 
   async function initBackupHandle() {
-    state.backupHandle = await getMeta('backupFileHandle');
+    try {
+      state.backupHandle = await getMeta('backupFileHandle');
+    } catch (error) {
+      console.warn('Failed to restore linked backup handle. Continuing without linked backup.', error);
+      state.backupHandle = null;
+    }
+
     if (!state.backupHandle) {
       setStatus('Tip: Link vocab_backup.json once for true overwrite auto-backup to OneDrive.', 2800);
       return;
     }
 
-    const ok = await ensureBackupPermission();
-    if (ok) await backupToLinkedFile('startup');
+    try {
+      const ok = await ensureBackupPermission();
+      if (ok) await backupToLinkedFile('startup');
+    } catch (error) {
+      console.warn('Linked backup startup sync failed. Continuing app initialization.', error);
+      setStatus('Linked backup unavailable. Use Export backup or relink the file.', 2800);
+    }
   }
 
   function syncMobileUI() {
@@ -946,6 +957,7 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
 
