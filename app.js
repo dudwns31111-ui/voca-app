@@ -186,6 +186,14 @@
     return next.getTime();
   }
 
+  function isSameDay(tsA, tsB = Date.now()) {
+    const a = new Date(tsA);
+    const b = new Date(tsB);
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+  }
+
   function setStatus(message, holdMs = 1700) {
     els.status.textContent = message;
     if (!holdMs) return;
@@ -689,15 +697,19 @@
 
     const current = state.reviewPool[0];
     const now = Date.now();
+    const isFirstKnownOnCreatedDay = isKnown
+      && (current.reviewCount || 0) === 0
+      && isSameDay(current.createdAt, now);
+
     const nextInterval = isKnown
-      ? Math.max(1, Math.round((current.interval || 1) * 2))
+      ? (isFirstKnownOnCreatedDay ? 1 : Math.max(1, Math.round((current.interval || 1) * 2)))
       : 1;
 
     const updated = {
       ...current,
       interval: nextInterval,
       lastReviewedAt: now,
-      nextReviewAt: isKnown ? getNextReviewAt(nextInterval) : getNextReviewAt(1),
+      nextReviewAt: getNextReviewAt(nextInterval),
       reviewCount: isKnown ? (current.reviewCount || 0) + 1 : (current.reviewCount || 0)
     };
 
@@ -921,5 +933,6 @@
     setStatus('App failed to initialize.', 2600);
   });
 })();
+
 
 
